@@ -20,7 +20,8 @@ import Vapor
 extension SearchResults: Content {
 
     init(response: GWResponse<[GWRecipe]>, provider: CookpadProvider) {
-        self.results = response.result.map { Recipe(recipe: $0, language: provider.language) }
+        self.results = response.result
+            .map({ Recipe(recipe: $0, language: provider.language) })
         self.language = provider.language
         self.provider = provider.id
         self.nextPage = response.extra.links?.next?.page
