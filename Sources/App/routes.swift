@@ -1,5 +1,81 @@
 import Vapor
 
+private class RequestPerformer {
+
+    let settings: SettingsStore
+
+    let provider: CookpadProvider
+
+    let eventLoop: EventLoop
+
+    let page: Int
+
+    let perPage: Int
+
+    init(settings: SettingsStore, provider: CookpadProvider, eventLoop: EventLoop, page: Int, perPage: Int) {
+
+        self.settings = settings
+        self.provider = provider
+        self.eventLoop = eventLoop
+        self.page = page
+        self.perPage = perPage
+    }
+
+    func getSuggestions() throws -> Future<SearchResults> {
+
+        // Build the new url
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = settings.apiHost
+        components.path = "/v9/recipe_feeds"
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "per_page", value: String(perPage))
+        ]
+
+        // Ensure the url is valid
+        guard let url = components.url else { throw Abort(.internalServerError) }
+
+        // Build the complete request
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(settings.apiAnonymousToken)", forHTTPHeaderField: "Authorization")
+        request.addValue(String(provider.rawValue), forHTTPHeaderField: "X-Cookpad-Provider-Id")
+
+        // Return a description of the request for display
+        return URLSession.shared
+            .perform(request: request, in: eventLoop, expecting: GWResponse<[GWFeed]>.self)
+            .map { [provider] in SearchResults(response: $0, provider: provider) }
+    }
+
+    func search(with query: String, order: String) throws -> Future<SearchResults> {
+
+        // Build the new url
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = settings.apiHost
+        components.path = "/v9/recipes"
+        components.queryItems = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "order", value: order),
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "per_page", value: String(perPage))
+        ]
+
+        // Ensure the url is valid
+        guard let url = components.url else { throw Abort(.internalServerError) }
+
+        // Build the complete request
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(settings.apiAnonymousToken)", forHTTPHeaderField: "Authorization")
+        request.addValue(String(provider.rawValue), forHTTPHeaderField: "X-Cookpad-Provider-Id")
+
+        // Return a description of the request for display
+        return URLSession.shared
+            .perform(request: request, in: eventLoop, expecting: GWResponse<[GWRecipe]>.self)
+            .map { [provider] in SearchResults(response: $0, provider: provider) }
+    }
+}
+
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
 
@@ -9,38 +85,28 @@ public func routes(_ router: Router) throws {
         // Read the base settings as we need these for forwarding requests
         let settings = try req.settingsStore()
 
-        // Read the search query and ensure it's valid
-        let searchQuery = try req.query.decode(SearchQuery.self)
-        try searchQuery.validate()
+        // Read the request query and ensure it's valid
+        let requestQuery = try req.query.decode(RecipesQuery.self)
+        try requestQuery.validate()
 
-        // Infer the provider based on the search query
-        guard let provider = searchQuery.detectProvider() else {
+        // Infer the provider based on the query language
+        guard let provider = Language(requestQuery.language).provider else {
             throw Abort(badRequest: .unknownProvider)
         }
 
-        // Build the new url
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = settings.apiHost
-        components.path = "/v8/recipes"
-        components.queryItems = [
-            URLQueryItem(name: "query", value: searchQuery.query),
-            URLQueryItem(name: "order", value: searchQuery.order.rawValue),
-            URLQueryItem(name: "page", value: String(searchQuery.page)),
-            URLQueryItem(name: "per_page", value: String(searchQuery.per_page))
-        ]
+        // Create a performer with our base settings
+        let performer = RequestPerformer(settings: settings,
+                                         provider: provider,
+                                         eventLoop: req.eventLoop,
+                                         page: requestQuery.page ?? 1,
+                                         perPage: min(requestQuery.perPage ?? 20, 100))
 
-        // Ensure the url is valid
-        guard let url = components.url else { throw Abort.init(.internalServerError) }
-
-        // Build the complete request
-        var request = URLRequest(url: url)
-        request.addValue("Bearer \(settings.apiAnonymousToken)", forHTTPHeaderField: "Authorization")
-        request.addValue(String(provider.rawValue), forHTTPHeaderField: "X-Cookpad-Provider-Id")
-
-        // Return a description of the request for display
-        return URLSession.shared
-            .perform(request: request, in: req.eventLoop, expecting: GWResponse<[GWRecipe]>.self)
-            .map { SearchResults(response: $0, provider: provider) }
+        // Switch on the query mode and perform the correct action
+        switch requestQuery.mode {
+        case .suggestions:
+            return try performer.getSuggestions()
+        case let .search(query, order):
+            return try performer.search(with: query, order: order.rawValue)
+        }
     }
 }

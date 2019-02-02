@@ -27,4 +27,15 @@ extension SearchResults: Content {
         self.previousPage = response.extra.links?.prev?.page
         self.totalCount = response.extra.total_count ?? 0
     }
+
+    init(response: GWResponse<[GWFeed]>, provider: CookpadProvider) {
+        self.results = response.result
+            .compactMap({ $0.recipe })
+            .map({ Recipe(recipe: $0, language: provider.language) })
+        self.language = provider.language
+        self.provider = provider.id
+        self.nextPage = response.extra.links?.next?.page
+        self.previousPage = response.extra.links?.prev?.page
+        self.totalCount = response.extra.total_count ?? 0
+    }
 }
