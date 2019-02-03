@@ -2,9 +2,14 @@ import Vapor
 
 struct SettingsStore: Service {
 
+    /// Real global-web hostname
     let apiHost: String
 
+    /// Real global-web anonymous token for guest user requests
     let apiAnonymousToken: String
+
+    /// API access token for this apps interface
+    let accessToken: String
 
     fileprivate init() throws {
 
@@ -16,8 +21,21 @@ struct SettingsStore: Service {
             throw Abort(internalServerError: .badEnvironment(key: "CKPD_API_ANONYMOUS_TOKEN"))
         }
 
+        guard let accessToken = Environment.get("GS_ACCESS_TOKEN"), !accessToken.isEmpty else {
+            throw Abort(internalServerError: .badEnvironment(key: "GS_ACCESS_TOKEN"))
+        }
+
         self.apiHost = apiHost
         self.apiAnonymousToken = apiAnonymousToken
+        self.accessToken = accessToken
+    }
+
+    func guardAuthentication(for request: Request) throws {
+
+        // Ensure that a valid header had been supplied while making the request
+        guard request.http.headers[.authorization].first(where: { $0 == "Bearer \(accessToken)"}) != nil else {
+            throw Abort(.unauthorized)
+        }
     }
 }
 

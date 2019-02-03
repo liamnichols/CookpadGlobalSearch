@@ -9,6 +9,9 @@ public func routes(_ router: Router) throws {
         // Read the base settings as we need these for forwarding requests
         let settings = try req.settingsStore()
 
+        // Ensure that the request was properly authenticated
+        try settings.guardAuthentication(for: req)
+
         // Read the request query and ensure it's valid
         let requestQuery = try req.query.decode(RecipesQuery.self)
         try requestQuery.validate()

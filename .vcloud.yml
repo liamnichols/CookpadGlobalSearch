@@ -4,7 +4,9 @@ run_parameters: "serve --port 8080 --hostname 0.0.0.0"
 config:
   staging:
     CKPD_API_HOST: "globalweb-api-staging.ckpd.co"
-    # CKPD_API_ANONYMOUS_TOKEN: "" # Inject via CLI - https://docs.vapor.cloud/configuration/vapor/custom-config/#cli
+    # CKPD_API_ANONYMOUS_TOKEN: "" # vapor cloud config modify --app=global-search --env=staging CKPD_API_ANONYMOUS_TOKEN=
+    # GS_ACCESS_TOKEN: "" # vapor cloud config modify --app=global-search --env=staging GS_ACCESS_TOKEN=
   production:
     CKPD_API_HOST: "global-api.cookpad.com"
-    # CKPD_API_ANONYMOUS_TOKEN: "" # Inject via CLI - https://docs.vapor.cloud/configuration/vapor/custom-config/#cli
+    # CKPD_API_ANONYMOUS_TOKEN: "" # vapor cloud config modify --app=global-search --env=production CKPD_API_ANONYMOUS_TOKEN=
+    # GS_ACCESS_TOKEN: "" # vapor cloud config modify --app=global-search --env=production GS_ACCESS_TOKEN=
