@@ -8,7 +8,7 @@ enum InternalServerError {
     var reason: String {
         switch self {
         case .badEnvironment(let key):
-            return "The '\(key)' environment variable was not configured correctly."
+            return "The '\(key)' environment variable was not configured correctly. List of defined variable names: \(ProcessInfo.processInfo.environment.keys.joined(separator: ", "))."
         case .badURLComponents(let path):
             return "The url components were not able to construct a valid URL for '\(path)'."
         }
